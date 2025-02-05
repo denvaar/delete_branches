@@ -1,0 +1,60 @@
+#!/bin/sh
+
+
+help() {
+  echo "Usage: $0 <file1> <file2> [find] [replace]"
+  echo "Example 1: $0 .env1 .env2"
+  echo "Example 2: $0 .env1 .env2 YOUR_INITIALS dsmith"
+  echo ""
+
+  exit 1
+}
+
+
+if [ $# -ne 4 ] && [ $# -ne 2 ]; then
+  help
+fi
+
+
+standardize() {
+  cat "$1" \
+    | grep -E '^[^#]' \
+    | sed -E "s/$2/$3/g" \
+    | sed -E 's/^([A-Z0-9_]+)[ ]*=[ "]*(.*)["]$/\1=\2/' \
+    | sort
+}
+
+
+personalize() {
+  echo "$1" | sed -E "s/$2/$3/g"
+}
+
+
+file1="$1"
+file2="$2"
+find_val="${3:-whatever}"
+replace_val="${4:-whatever}"
+env1=$(standardize "$file1" "$replace_val" "$find_val")
+env2=$(standardize "$file2" "$replace_val" "$find_val")
+
+printf "%s\n" "$env1" | sed -E 's/=/Ÿ/' | while IFS="Ÿ" read -r key1 value1; do
+  keymatch=$(echo "$env2" | grep -E "^$key1=")
+  value2=$(echo "$keymatch" | cut -d'=' -f2-)
+
+  if [ -z "${keymatch}" ]; then
+    printf "[new]    %s is in %s; not in %s\n" "$key1" "$file1" "$file2"
+  elif [ "$value1" != "$value2" ]; then
+    personalized_value1=$(personalize "$value1" "$find_val" "$replace_val")
+    personalized_value2=$(personalize "$value2" "$find_val" "$replace_val")
+
+    printf "[change] %s has %s as '%s'; %s has it as '%s'\n" "$file1" "$key1" "$personalized_value1" "$file2" "$personalized_value2"
+  fi
+done
+
+printf "%s\n" "$env2" | sed -E 's/=/Ÿ/' | while IFS="Ÿ" read -r key2 value2; do
+  keymatch=$(echo "$env1" | grep -E "^$key2=")
+
+  if [ -z "${keymatch}" ]; then
+    printf "[new]    %s is in %s; not in %s\n" "$key2" "$file2" "$file1"
+  fi
+done
