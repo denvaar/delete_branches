@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 BRANCHES=$(git branch | grep -E -v "(main|\*)" | sed 's/^  //' | tr '\n' ' ')
 
